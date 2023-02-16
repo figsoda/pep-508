@@ -1,0 +1,19 @@
+name: ci
+
+on: [push, pull_request]
+
+jobs:
+  ci:
+    name: ci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: "Cargo: test, clippy, fmt"
+        run: |
+          rustup toolchain install stable --profile minimal -c clippy
+          rustup toolchain install nightly --profile minimal -c rustfmt
+          cargo +stable test
+          cargo +stable clippy -- -D warnings
+          cargo +nightly fmt -- --check
