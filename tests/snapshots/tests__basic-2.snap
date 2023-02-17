@@ -1,0 +1,12 @@
+---
+source: tests/tests.rs
+expression: "parse(\"beautifulsoup4\")"
+---
+Ok(
+    Dependency {
+        name: "beautifulsoup4",
+        extras: [],
+        spec: None,
+        marker: None,
+    },
+)

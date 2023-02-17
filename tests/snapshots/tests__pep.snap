@@ -1,0 +1,12 @@
+---
+source: tests/tests.rs
+expression: "parse(\"A\")"
+---
+Ok(
+    Dependency {
+        name: "A",
+        extras: [],
+        spec: None,
+        marker: None,
+    },
+)

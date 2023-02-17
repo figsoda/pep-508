@@ -1,0 +1,36 @@
+---
+source: tests/tests.rs
+expression: "parse(\"name[quux, strange];python_version<'3.7' and platform_version=='2'\")"
+---
+Ok(
+    Dependency {
+        name: "name",
+        extras: [
+            "quux",
+            "strange",
+        ],
+        spec: None,
+        marker: Some(
+            And(
+                Operator(
+                    PythonVersion,
+                    Comparator(
+                        Lt,
+                    ),
+                    String(
+                        "3.7",
+                    ),
+                ),
+                Operator(
+                    PlatformVersion,
+                    Comparator(
+                        Eq,
+                    ),
+                    String(
+                        "2",
+                    ),
+                ),
+            ),
+        ),
+    },
+)

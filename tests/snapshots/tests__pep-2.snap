@@ -1,0 +1,12 @@
+---
+source: tests/tests.rs
+expression: "parse(\"A.B-C_D\")"
+---
+Ok(
+    Dependency {
+        name: "A.B-C_D",
+        extras: [],
+        spec: None,
+        marker: None,
+    },
+)

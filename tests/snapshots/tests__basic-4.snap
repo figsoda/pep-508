@@ -1,0 +1,22 @@
+---
+source: tests/tests.rs
+expression: "parse(\"tomli;python_version<'3.11'\")"
+---
+Ok(
+    Dependency {
+        name: "tomli",
+        extras: [],
+        spec: None,
+        marker: Some(
+            Operator(
+                PythonVersion,
+                Comparator(
+                    Lt,
+                ),
+                String(
+                    "3.11",
+                ),
+            ),
+        ),
+    },
+)

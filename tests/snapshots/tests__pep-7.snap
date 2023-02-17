@@ -1,0 +1,25 @@
+---
+source: tests/tests.rs
+expression: "parse(\"name>=3,<2\")"
+---
+Ok(
+    Dependency {
+        name: "name",
+        extras: [],
+        spec: Some(
+            Version(
+                [
+                    VersionSpec {
+                        comparator: Ge,
+                        version: "3",
+                    },
+                    VersionSpec {
+                        comparator: Lt,
+                        version: "2",
+                    },
+                ],
+            ),
+        ),
+        marker: None,
+    },
+)

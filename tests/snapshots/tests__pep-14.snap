@@ -1,0 +1,44 @@
+---
+source: tests/tests.rs
+expression: "parse(\"name; os_name=='a' or os_name=='b' and os_name=='c'\")"
+---
+Ok(
+    Dependency {
+        name: "name",
+        extras: [],
+        spec: None,
+        marker: Some(
+            Or(
+                Operator(
+                    OsName,
+                    Comparator(
+                        Eq,
+                    ),
+                    String(
+                        "a",
+                    ),
+                ),
+                And(
+                    Operator(
+                        OsName,
+                        Comparator(
+                            Eq,
+                        ),
+                        String(
+                            "b",
+                        ),
+                    ),
+                    Operator(
+                        OsName,
+                        Comparator(
+                            Eq,
+                        ),
+                        String(
+                            "c",
+                        ),
+                    ),
+                ),
+            ),
+        ),
+    },
+)

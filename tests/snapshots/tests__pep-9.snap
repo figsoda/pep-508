@@ -1,0 +1,29 @@
+---
+source: tests/tests.rs
+expression: "parse(\"name [fred,bar] @ http://foo.com ; python_version=='3.7'\")"
+---
+Ok(
+    Dependency {
+        name: "name",
+        extras: [
+            "fred",
+            "bar",
+        ],
+        spec: Some(
+            Url(
+                "http://foo.com",
+            ),
+        ),
+        marker: Some(
+            Operator(
+                PythonVersion,
+                Comparator(
+                    Eq,
+                ),
+                String(
+                    "3.7",
+                ),
+            ),
+        ),
+    },
+)

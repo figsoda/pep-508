@@ -1,0 +1,16 @@
+---
+source: tests/tests.rs
+expression: "parse(\"name@http://foo.com\")"
+---
+Ok(
+    Dependency {
+        name: "name",
+        extras: [],
+        spec: Some(
+            Url(
+                "http://foo.com",
+            ),
+        ),
+        marker: None,
+    },
+)

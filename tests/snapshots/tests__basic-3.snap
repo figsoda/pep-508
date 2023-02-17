@@ -1,0 +1,21 @@
+---
+source: tests/tests.rs
+expression: "parse(\"Click>=7.0\")"
+---
+Ok(
+    Dependency {
+        name: "Click",
+        extras: [],
+        spec: Some(
+            Version(
+                [
+                    VersionSpec {
+                        comparator: Ge,
+                        version: "7.0",
+                    },
+                ],
+            ),
+        ),
+        marker: None,
+    },
+)
