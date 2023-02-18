@@ -3,14 +3,14 @@ name = "pep-508"
 version = "0.1.0"
 authors = ["figsoda <figsoda@pm.me>"]
 edition = "2021"
-description = ""
+description = "Python dependency parser for PEP 508"
 documentation = "https://docs.rs/pep-508"
 readme = "README.md"
 homepage = "https://github.com/figsoda/pep-508"
 repository = "https://github.com/figsoda/pep-508"
 license = "MPL-2.0"
-keywords = []
-categories = []
+keywords = ["dependency", "parser", "pep508", "python", "requirements"]
+categories = ["parser-implementations"]
 
 [dependencies]
 chumsky = "0.9.0"

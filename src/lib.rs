@@ -1,3 +1,37 @@
+//! Python dependency parser for [PEP 508](https://peps.python.org/pep-0508)
+//!
+//! ```
+//! # use pep_508::*;
+//! let dep = "requests[security, socks] <= 2.28.1, == 2.28.*; python_version > '3.7' and extra == 'http'";
+//! let parsed = parse(dep).unwrap();
+//! let expected = Dependency {
+//!     name: "requests".to_owned(),
+//!     extras: vec!["security".to_owned(), "socks".to_owned()],
+//!     spec: Some(Spec::Version(vec![
+//!         VersionSpec {
+//!             comparator: Comparator::Le,
+//!             version: "2.28.1".to_owned(),
+//!         },
+//!         VersionSpec {
+//!             comparator: Comparator::Eq,
+//!             version: "2.28.*".to_owned(),
+//!         },
+//!     ])),
+//!     marker: Some(Marker::And(
+//!         Box::new(Marker::Operator(
+//!             Variable::PythonVersion,
+//!             Operator::Comparator(Comparator::Gt),
+//!             Variable::String("3.7".to_owned()),
+//!         )),
+//!         Box::new(Marker::Operator(
+//!             Variable::Extra,
+//!             Operator::Comparator(Comparator::Eq),
+//!             Variable::String("http".to_owned()),
+//!         )),
+//!     )),
+//! };
+//! assert_eq!(parsed, expected);
+//! ```
 mod macros;
 mod url;
 
@@ -10,34 +44,41 @@ use chumsky::{
 
 use crate::macros::set;
 
-#[derive(Clone, Debug)]
+/// Python dependency specified by [PEP 508](https://peps.python.org/pep-0508)
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Dependency {
+    /// Name of the dependency
     pub name: String,
+    /// Extras for the dependency, things that go inside `[]`
     pub extras: Vec<String>,
+    /// Version specification or URL
     pub spec: Option<Spec>,
+    /// Environment markers, conditions that go after `;`
     pub marker: Option<Marker>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Spec {
+    /// `foo @ https://example.com`
     Url(String),
+    /// `foo >= 0.1.0, < 0.2.0`
     Version(Vec<VersionSpec>),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct VersionSpec {
     pub comparator: Comparator,
     pub version: String,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Marker {
     And(Box<Marker>, Box<Marker>),
     Or(Box<Marker>, Box<Marker>),
     Operator(Variable, Operator, Variable),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Variable {
     PythonVersion,
     PythonFullVersion,
@@ -54,29 +95,42 @@ pub enum Variable {
     String(String),
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Operator {
     Comparator(Comparator),
+    /// `in`
     In,
+    /// `not in`
     NotIn,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Comparator {
-    Lt, // <
-    Le, // <=
-    Ne, // !=
-    Eq, // ==
-    Ge, // >=
-    Gt, // >
-    Cp, // ~=
-    Ae, // ===
+    /// `foo < '0.1.0'`
+    Lt,
+    /// `foo < '0.1.0'`
+    Le,
+    /// `foo != '0.1.0'`
+    Ne,
+    /// `foo == '0.1.0'`
+    Eq,
+    /// `foo >= '0.1.0'`
+    Ge,
+    /// `foo > '0.1.0'`
+    Gt,
+    /// `foo ~= '0.1.0'`
+    Cp,
+    /// `foo === '0.1.0'`
+    Ae,
 }
 
+/// Parse a [PEP 508](https://peps.python.org/pep-0508) string into a [Dependency]
 pub fn parse(s: &str) -> Result<Dependency, Vec<Simple<char>>> {
     parser().then_ignore(end()).parse(s)
 }
 
+/// Create a [chumsky](https://docs.rs/chumsky) parser,
+/// allows more customization than [parse]
 pub fn parser<E: Error<char> + 'static>() -> impl Parser<char, Dependency, Error = E> {
     let ws = set!(' ' | '\t').repeated().ignored();
     let ident = filter(char::is_ascii_alphanumeric)
