@@ -39,8 +39,10 @@ use chumsky::{
     prelude::Simple,
     primitive::{choice, end, filter, just},
     recursive::recursive,
-    Error, Parser,
+    Error, Parser, Stream,
 };
+
+use std::ops::Range;
 
 use crate::macros::set;
 
@@ -125,8 +127,15 @@ pub enum Comparator {
 }
 
 /// Parse a [PEP 508](https://peps.python.org/pep-0508) string into a [Dependency]
-pub fn parse(s: &str) -> Result<Dependency, Vec<Simple<char>>> {
-    parser().then_ignore(end()).parse(s)
+/// ```
+/// # use pep_508::parse;
+/// assert_eq!(parse("requests >= 2").unwrap().name, "requests");
+/// assert_eq!(parse(String::from("numpy")).unwrap().name, "numpy");
+/// ```
+pub fn parse<'a, I: Iterator<Item = (char, Range<usize>)> + 'a>(
+    dependency: impl Into<Stream<'a, char, Range<usize>, I>>,
+) -> Result<Dependency, Vec<Simple<char>>> {
+    parser().then_ignore(end()).parse(dependency)
 }
 
 /// Create a [chumsky](https://docs.rs/chumsky) parser,
