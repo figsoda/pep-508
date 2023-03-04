@@ -5,28 +5,28 @@
 //! let dep = "requests[security, socks] <= 2.28.1, == 2.28.*; python_version > '3.7' and extra == 'http'";
 //! let parsed = parse(dep).unwrap();
 //! let expected = Dependency {
-//!     name: "requests".to_owned(),
-//!     extras: vec!["security".to_owned(), "socks".to_owned()],
+//!     name: "requests",
+//!     extras: vec!["security", "socks"],
 //!     spec: Some(Spec::Version(vec![
 //!         VersionSpec {
 //!             comparator: Comparator::Le,
-//!             version: "2.28.1".to_owned(),
+//!             version: "2.28.1",
 //!         },
 //!         VersionSpec {
 //!             comparator: Comparator::Eq,
-//!             version: "2.28.*".to_owned(),
+//!             version: "2.28.*",
 //!         },
 //!     ])),
 //!     marker: Some(Marker::And(
 //!         Box::new(Marker::Operator(
 //!             Variable::PythonVersion,
 //!             Operator::Comparator(Comparator::Gt),
-//!             Variable::String("3.7".to_owned()),
+//!             Variable::String("3.7"),
 //!         )),
 //!         Box::new(Marker::Operator(
 //!             Variable::Extra,
 //!             Operator::Comparator(Comparator::Eq),
-//!             Variable::String("http".to_owned()),
+//!             Variable::String("http"),
 //!         )),
 //!     )),
 //! };
@@ -130,7 +130,7 @@ pub enum Comparator {
 /// ```
 /// # use pep_508::parse;
 /// assert_eq!(parse("requests >= 2").unwrap().name, "requests");
-/// assert_eq!(parse(String::from("numpy")).unwrap().name, "numpy");
+/// assert_eq!(parse("numpy").unwrap().name, "numpy");
 /// ```
 pub fn parse(dependency: &str) -> Result<Dependency, Vec<Simple<&str>>> {
     parser().then_ignore(end()).parse(dependency).into_result()
