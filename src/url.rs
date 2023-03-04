@@ -1,6 +1,8 @@
 use chumsky::{
-    primitive::{choice, filter, just},
-    Error, Parser,
+    error::Error,
+    extra::Full,
+    primitive::{any, choice, group, just},
+    Parser,
 };
 
 use crate::macros::set;
@@ -12,145 +14,142 @@ macro_rules! c {
     };
 }
 
-pub(crate) fn parser<E: Error<char> + 'static>() -> impl Parser<char, String, Error = E> {
+pub(crate) fn parser<'a, E: Error<'a, &'a str> + 'a>(
+) -> impl Parser<'a, &'a str, &'a str, Full<E, (), ()>> {
     let c = set!(c!());
-    let digit = filter(char::is_ascii_digit);
-    let hex = filter(char::is_ascii_hexdigit);
+    let digit = any().filter(char::is_ascii_digit);
+    let hex = any().filter(char::is_ascii_hexdigit);
     let percent = just('%').then_ignore(hex.repeated().exactly(2).rewind());
     let reg = percent.or(c);
     let pchar = percent.or(set!(c!() | ':' | '@'));
 
     let octet = choice((
-        just('1').chain(digit).chain(digit),
-        just('2').chain(
-            set!('0' ..= '4')
-                .chain(digit)
-                .or(just('5').chain(set!('0' ..= '5'))),
-        ),
-        set!('1' ..= '9').chain(digit),
-        digit.map(|c| vec![c]),
+        group((just('1'), digit, digit)).ignored(),
+        just('2')
+            .then(
+                set!('0' ..= '4')
+                    .then(digit)
+                    .or(just('5').then(set!('0' ..= '5'))),
+            )
+            .ignored(),
+        set!('1' ..= '9').then(digit).ignored(),
+        digit.map(|c| vec![c]).ignored(),
     ));
-    let ipv4 = octet
-        .chain(just('.'))
-        .chain::<char, _, _>(octet)
-        .chain(just('.'))
-        .chain::<char, _, _>(octet)
-        .chain(just('.'))
-        .chain(octet);
+    let ipv4 = group((octet, just('.'), octet, just('.'), octet, just('.'), octet)).ignored();
     let h16 = hex.repeated().at_least(1).at_most(4);
-    let h16r = just(':').chain(h16).repeated();
-    let ls32 = h16.chain(just(':')).chain(h16).or(ipv4);
+    let h16r = just(':').then(h16).repeated();
+    let ls32 = group((h16, just(':'), h16)).ignored().or(ipv4);
 
-    let segments = just('/').chain(pchar.repeated()).repeated().flatten();
+    let segments = just('/').then(pchar.repeated()).repeated();
     let frag = percent.or(set!(c!() | ':' | '@' | '/' | '?')).repeated();
     let frags = just('?')
-        .chain(frag)
-        .or_else(|_| Ok(Vec::new()))
-        .chain::<char, _, _>(just('#').chain(frag).or_else(|_| Ok(Vec::new())));
+        .then(frag)
+        .or_not()
+        .then(just('#').then(frag).or_not());
 
-    let path = just('/').chain(
-        just('/')
-            .chain(
+    let path = just('/')
+        .then(
+            group((
+                just('/'),
                 percent
                     .or(set!(c!() | ':'))
                     .repeated()
-                    .chain(just('@'))
-                    .or_else(|_| Ok(Vec::new())),
-            )
-            .chain::<char, _, _>(choice((
-                just('[')
-                    .chain(choice((
-                        just('v')
-                            .chain(hex.repeated().at_least(1))
-                            .chain(just('.'))
-                            .chain(set!(c!() | ':').repeated().at_least(1)),
-                        h16.chain(just(':'))
-                            .repeated()
-                            .exactly(6)
-                            .flatten()
-                            .chain(ls32),
-                        just(':')
-                            .chain(just(':'))
-                            .chain::<char, _, _>(h16r.exactly(5).flatten())
-                            .chain(ls32),
-                        h16.or_not()
-                            .chain(just(':'))
-                            .chain(just(':'))
-                            .chain::<char, _, _>(h16r.exactly(4).flatten())
-                            .chain(ls32),
-                        h16.chain(just(':'))
-                            .or_not()
-                            .chain(h16)
-                            .or_not()
-                            .chain(just(':'))
-                            .chain(just(':'))
-                            .chain::<char, _, _>(h16r.exactly(3).flatten())
-                            .chain(ls32),
-                        h16.chain(h16r.at_most(2).flatten())
-                            .or_not()
-                            .chain(just(':'))
-                            .chain(just(':'))
-                            .chain::<char, _, _>(h16r.exactly(2).flatten())
-                            .chain(ls32),
-                        h16.chain(h16r.at_most(3).flatten())
-                            .or_not()
-                            .chain(just(':'))
-                            .chain(just(':'))
-                            .chain::<char, _, _>(h16)
-                            .chain(just(':'))
-                            .chain(ls32),
-                        h16.chain(h16r.at_most(4).flatten())
-                            .or_not()
-                            .chain(just(':'))
-                            .chain(just(':'))
-                            .chain(ls32),
-                        h16.chain(h16r.at_most(5).flatten())
-                            .or_not()
-                            .chain(just(':'))
-                            .chain(just(':'))
-                            .chain(h16),
-                        h16.chain(h16r.at_most(6).flatten())
-                            .or_not()
-                            .chain(just(':'))
-                            .chain(just(':')),
-                        // filter(|_| true).map(|_| todo!()),
-                    )))
-                    .chain(just(']')),
-                ipv4,
-                reg.repeated(),
-            )))
-            .chain::<char, _, _>(just(':').chain(digit.repeated()).or_not())
-            .chain(segments)
+                    .then(just('@'))
+                    .or_not(),
+                choice((
+                    just('[')
+                        .then(choice((
+                            group((
+                                just('v'),
+                                hex.repeated().at_least(1),
+                                just('.'),
+                                set!(c!() | ':').repeated().at_least(1),
+                            ))
+                            .ignored(),
+                            h16.then(just(':'))
+                                .repeated()
+                                .exactly(6)
+                                .then(ls32)
+                                .ignored(),
+                            group((just("::"), h16r.exactly(5), ls32)).ignored(),
+                            group((h16.or_not(), just("::"), h16r.exactly(4), ls32)).ignored(),
+                            group((
+                                h16.then(just(':')).or_not().then(h16).or_not(),
+                                just("::"),
+                                h16r.exactly(3),
+                                ls32,
+                            ))
+                            .ignored(),
+                            group((
+                                h16.then(h16r.at_most(2)).or_not(),
+                                just(':'),
+                                just(':'),
+                                h16r.exactly(2),
+                                ls32,
+                            ))
+                            .ignored(),
+                            group((
+                                h16.then(h16r.at_most(3)).or_not(),
+                                just("::"),
+                                h16,
+                                just(':'),
+                                ls32,
+                            ))
+                            .ignored(),
+                            group((h16.then(h16r.at_most(4)).or_not(), just("::"), ls32)).ignored(),
+                            group((h16.then(h16r.at_most(5)).or_not(), just("::"), h16)).ignored(),
+                            h16.then(h16r.at_most(6))
+                                .or_not()
+                                .then(just("::"))
+                                .ignored(),
+                        )))
+                        .then(just(']'))
+                        .ignored(),
+                    ipv4,
+                    reg.repeated(),
+                )),
+                just(':').then(digit.repeated()).or_not(),
+                segments,
+            ))
+            .ignored()
             .or(pchar
                 .repeated()
                 .at_least(1)
-                .chain(segments)
-                .or_else(|_| Ok(Vec::new())))
+                .then(segments)
+                .or_not()
+                .ignored())
             .or_not(),
-    );
+        )
+        .ignored();
 
-    filter(char::is_ascii_alphabetic)
-        .chain(set!('A' ..= 'Z' | 'a' ..= 'z' | '0' ..= '9' | '+' | '-' | '.').repeated())
-        .chain(just(':'))
-        .chain::<char, _, _>(path.or(pchar.repeated().at_least(1).chain(segments)))
-        .or(path)
-        .or(percent
+    choice((
+        group((
+            any().filter(char::is_ascii_alphabetic),
+            set!('A' ..= 'Z' | 'a' ..= 'z' | '0' ..= '9' | '+' | '-' | '.').repeated(),
+            just(':'),
+            path.or(pchar.repeated().at_least(1).then(segments).ignored()),
+        ))
+        .ignored(),
+        path,
+        percent
             .or(set!(c!() | '@'))
             .repeated()
             .at_least(1)
-            .chain(segments))
-        .chain::<char, _, _>(frags)
-        .collect()
+            .then(segments)
+            .ignored(),
+    ))
+    .then(frags)
+    .slice()
 }
 
 #[cfg(test)]
 mod tests {
-    use chumsky::{prelude::Simple, primitive::end, Parser};
+    use chumsky::{prelude::Rich, primitive::end, Parser};
 
     use super::parser;
 
-    fn parse(s: &str) -> Result<String, Vec<Simple<char>>> {
-        parser().then_ignore(end()).parse(s)
+    fn parse(s: &str) -> Result<&str, Vec<Rich<&str>>> {
+        parser().then_ignore(end()).parse(s).into_result()
     }
 
     fn check(urls: impl IntoIterator<Item = impl AsRef<str>>) {

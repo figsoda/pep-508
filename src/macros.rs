@@ -1,6 +1,6 @@
 macro_rules! set {
     ($($tt:tt)+) => {
-        ::chumsky::primitive::filter(|c| matches!(c, $($tt)+))
+        ::chumsky::primitive::any().filter(|c| matches!(c, $($tt)+))
     };
 }
 

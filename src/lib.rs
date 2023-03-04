@@ -36,52 +36,52 @@ mod macros;
 mod url;
 
 use chumsky::{
+    error::Error,
+    extra::Full,
     prelude::Simple,
-    primitive::{choice, end, filter, just},
+    primitive::{any, choice, end, group, just},
     recursive::recursive,
-    Error, Parser, Stream,
+    IterParser, Parser,
 };
-
-use std::ops::Range;
 
 use crate::macros::set;
 
 /// Python dependency specified by [PEP 508](https://peps.python.org/pep-0508)
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Dependency {
+pub struct Dependency<'a> {
     /// Name of the dependency
-    pub name: String,
+    pub name: &'a str,
     /// Extras for the dependency, things that go inside `[]`
-    pub extras: Vec<String>,
+    pub extras: Vec<&'a str>,
     /// Version specification or URL
-    pub spec: Option<Spec>,
+    pub spec: Option<Spec<'a>>,
     /// Environment markers, conditions that go after `;`
-    pub marker: Option<Marker>,
+    pub marker: Option<Marker<'a>>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum Spec {
+pub enum Spec<'a> {
     /// `foo @ https://example.com`
-    Url(String),
+    Url(&'a str),
     /// `foo >= 0.1.0, < 0.2.0`
-    Version(Vec<VersionSpec>),
+    Version(Vec<VersionSpec<'a>>),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct VersionSpec {
+pub struct VersionSpec<'a> {
     pub comparator: Comparator,
-    pub version: String,
+    pub version: &'a str,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum Marker {
-    And(Box<Marker>, Box<Marker>),
-    Or(Box<Marker>, Box<Marker>),
-    Operator(Variable, Operator, Variable),
+pub enum Marker<'a> {
+    And(Box<Marker<'a>>, Box<Marker<'a>>),
+    Or(Box<Marker<'a>>, Box<Marker<'a>>),
+    Operator(Variable<'a>, Operator, Variable<'a>),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum Variable {
+pub enum Variable<'a> {
     PythonVersion,
     PythonFullVersion,
     OsName,
@@ -94,7 +94,7 @@ pub enum Variable {
     ImplementationName,
     ImplementationVersion,
     Extra,
-    String(String),
+    String(&'a str),
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -132,25 +132,24 @@ pub enum Comparator {
 /// assert_eq!(parse("requests >= 2").unwrap().name, "requests");
 /// assert_eq!(parse(String::from("numpy")).unwrap().name, "numpy");
 /// ```
-pub fn parse<'a, I: Iterator<Item = (char, Range<usize>)> + 'a>(
-    dependency: impl Into<Stream<'a, char, Range<usize>, I>>,
-) -> Result<Dependency, Vec<Simple<char>>> {
-    parser().then_ignore(end()).parse(dependency)
+pub fn parse(dependency: &str) -> Result<Dependency, Vec<Simple<&str>>> {
+    parser().then_ignore(end()).parse(dependency).into_result()
 }
 
 /// Create a [chumsky](https://docs.rs/chumsky) parser,
 /// allows more customization than [parse]
-pub fn parser<E: Error<char> + 'static>() -> impl Parser<char, Dependency, Error = E> {
+pub fn parser<'a, E: Error<'a, &'a str> + 'a>(
+) -> impl Parser<'a, &'a str, Dependency<'a>, Full<E, (), ()>> {
     let ws = set!(' ' | '\t').repeated().ignored();
-    let ident = filter(char::is_ascii_alphanumeric)
-        .chain(
+    let ident = any()
+        .filter(char::is_ascii_alphanumeric)
+        .then(
             set!('-' | '_' | '.')
                 .or_not()
-                .chain(filter(char::is_ascii_alphanumeric))
-                .repeated()
-                .flatten(),
+                .then(any().filter(char::is_ascii_alphanumeric))
+                .repeated(),
         )
-        .collect();
+        .slice();
 
     let cmp = choice((
         just("===").to(Comparator::Ae),
@@ -171,7 +170,7 @@ pub fn parser<E: Error<char> + 'static>() -> impl Parser<char, Dependency, Error
             )
             .repeated()
             .at_least(1)
-            .collect(),
+            .slice(),
         )
         .map(|(comparator, version)| VersionSpec {
             comparator,
@@ -179,36 +178,33 @@ pub fn parser<E: Error<char> + 'static>() -> impl Parser<char, Dependency, Error
         })
         .then_ignore(ws)
         .separated_by(just(',').ignore_then(ws))
-        .at_least(1);
+        .at_least(1)
+        .collect();
 
-    ws.ignore_then(ident)
-        .then_ignore(ws)
-        .then(
-            ident
-                .then_ignore(ws)
-                .separated_by(just(',').ignore_then(ws))
-                .at_least(1)
-                .delimited_by(just('[').ignore_then(ws), just(']'))
-                .then_ignore(ws)
-                .or_else(|_| Ok(Vec::new())),
-        )
-        .then(
-            just('@')
-                .ignore_then(ws)
-                .ignore_then(url::parser())
-                .map(Spec::Url)
-                .or(version_spec
-                    .delimited_by(just('(').then_ignore(ws), just(')'))
-                    .or(version_spec)
-                    .map(Spec::Version))
-                .then_ignore(ws)
-                .or_not(),
-        )
-        .then(
-            just(';')
-                .ignore_then(ws)
-                .ignore_then(recursive(|marker_or| {
-                    macro_rules! c {
+    group((
+        ws.ignore_then(ident).then_ignore(ws),
+        ident
+            .then_ignore(ws)
+            .separated_by(just(',').ignore_then(ws))
+            .at_least(1)
+            .collect()
+            .delimited_by(just('[').ignore_then(ws), just(']'))
+            .then_ignore(ws)
+            .or_else(|_| Ok(Vec::new())),
+        just('@')
+            .ignore_then(ws)
+            .ignore_then(url::parser())
+            .map(Spec::Url)
+            .or(version_spec
+                .delimited_by(just('(').then_ignore(ws), just(')'))
+                .or(version_spec)
+                .map(Spec::Version))
+            .then_ignore(ws)
+            .or_not(),
+        just(';')
+            .ignore_then(ws)
+            .ignore_then(recursive(|marker_or| {
+                macro_rules! c {
                         () => {
                             ' ' | '\t' | 'A' ..= 'Z' | 'a' ..= 'z' | '0' ..= '9' | '(' | ')' | '.' |
                             '{' | '}' | '-' | '_' | '*' | '#' | ':' | ';' | ',' | '/' | '?' | '[' |
@@ -217,80 +213,78 @@ pub fn parser<E: Error<char> + 'static>() -> impl Parser<char, Dependency, Error
                         };
                     }
 
-                    let marker_var = choice((
-                        just('\'')
-                            .ignore_then(set!(c!() | '"').repeated())
-                            .then_ignore(just('\''))
-                            .or(just('"')
-                                .ignore_then(set!(c!() | '\'').repeated())
-                                .then_ignore(just('"')))
-                            .collect()
-                            .map(Variable::String),
-                        just("python_version").to(Variable::PythonVersion),
-                        just("python_full_version").to(Variable::PythonFullVersion),
-                        just("os_name").to(Variable::OsName),
-                        just("sys_platform").to(Variable::SysPlatform),
-                        just("platform_release").to(Variable::PlatformRelease),
-                        just("platform_system").to(Variable::PlatformSystem),
-                        just("platform_version").to(Variable::PlatformVersion),
-                        just("platform_machine").to(Variable::PlatformMachine),
-                        just("platform_python_implementation")
-                            .to(Variable::PlatformPythonImplementation),
-                        just("implementation_name").to(Variable::ImplementationName),
-                        just("implementation_version").to(Variable::ImplementationVersion),
-                        just("extra").to(Variable::Extra),
-                    ));
+                let marker_var = choice((
+                    just('\'')
+                        .ignore_then(set!(c!() | '"').repeated().slice())
+                        .then_ignore(just('\''))
+                        .map(Variable::String),
+                    just('"')
+                        .ignore_then(set!(c!() | '\'').repeated().slice())
+                        .then_ignore(just('"'))
+                        .map(Variable::String),
+                    just("python_version").to(Variable::PythonVersion),
+                    just("python_full_version").to(Variable::PythonFullVersion),
+                    just("os_name").to(Variable::OsName),
+                    just("sys_platform").to(Variable::SysPlatform),
+                    just("platform_release").to(Variable::PlatformRelease),
+                    just("platform_system").to(Variable::PlatformSystem),
+                    just("platform_version").to(Variable::PlatformVersion),
+                    just("platform_machine").to(Variable::PlatformMachine),
+                    just("platform_python_implementation")
+                        .to(Variable::PlatformPythonImplementation),
+                    just("implementation_name").to(Variable::ImplementationName),
+                    just("implementation_version").to(Variable::ImplementationVersion),
+                    just("extra").to(Variable::Extra),
+                ));
 
-                    let marker_expr = marker_var
-                        .clone()
-                        .then_ignore(ws)
-                        .then(
-                            cmp.map(Operator::Comparator)
-                                .or(just("in").to(Operator::In).or(just("not")
-                                    .ignore_then(set!(' ' | '\t').repeated().at_least(1))
-                                    .ignore_then(just("in"))
-                                    .to(Operator::NotIn))),
-                        )
-                        .then_ignore(ws)
-                        .then(marker_var)
-                        .map(|((lhs, op), rhs)| Marker::Operator(lhs, op, rhs))
-                        .or(marker_or
-                            .then_ignore(ws)
-                            .delimited_by(just('(').then_ignore(ws), just(')')));
+                let marker_expr = group((
+                    marker_var.clone().then_ignore(ws),
+                    cmp.map(Operator::Comparator)
+                        .or(just("in").to(Operator::In).or(just("not")
+                            .ignore_then(set!(' ' | '\t').repeated().at_least(1))
+                            .ignore_then(just("in"))
+                            .to(Operator::NotIn)))
+                        .then_ignore(ws),
+                    marker_var,
+                ))
+                .map(|(lhs, op, rhs)| Marker::Operator(lhs, op, rhs))
+                .or(marker_or
+                    .then_ignore(ws)
+                    .delimited_by(just('(').then_ignore(ws), just(')')));
 
-                    let marker_and = marker_expr
-                        .clone()
-                        .then(
-                            ws.ignore_then(just("and"))
-                                .ignore_then(ws)
-                                .ignore_then(marker_expr)
-                                .or_not(),
-                        )
-                        .map(|(lhs, rhs)| match rhs {
-                            Some(rhs) => Marker::And(Box::new(lhs), Box::new(rhs)),
-                            None => lhs,
-                        });
+                let marker_and = marker_expr
+                    .clone()
+                    .then(
+                        ws.ignore_then(just("and"))
+                            .ignore_then(ws)
+                            .ignore_then(marker_expr)
+                            .or_not(),
+                    )
+                    .map(|(lhs, rhs)| match rhs {
+                        Some(rhs) => Marker::And(Box::new(lhs), Box::new(rhs)),
+                        None => lhs,
+                    });
 
-                    marker_and
-                        .clone()
-                        .then(
-                            ws.ignore_then(just("or"))
-                                .ignore_then(ws)
-                                .ignore_then(marker_and)
-                                .or_not(),
-                        )
-                        .map(|(lhs, rhs)| match rhs {
-                            Some(rhs) => Marker::Or(Box::new(lhs), Box::new(rhs)),
-                            None => lhs,
-                        })
-                }))
-                .or_not(),
-        )
-        .then_ignore(ws)
-        .map(|(((name, extras), spec), marker)| Dependency {
-            name,
-            extras,
-            spec,
-            marker,
-        })
+                marker_and
+                    .clone()
+                    .then(
+                        ws.ignore_then(just("or"))
+                            .ignore_then(ws)
+                            .ignore_then(marker_and)
+                            .or_not(),
+                    )
+                    .map(|(lhs, rhs)| match rhs {
+                        Some(rhs) => Marker::Or(Box::new(lhs), Box::new(rhs)),
+                        None => lhs,
+                    })
+            }))
+            .or_not(),
+    ))
+    .then_ignore(ws)
+    .map(|(name, extras, spec, marker)| Dependency {
+        name,
+        extras,
+        spec,
+        marker,
+    })
 }
