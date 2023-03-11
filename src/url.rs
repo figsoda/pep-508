@@ -148,7 +148,7 @@ mod tests {
 
     use super::parser;
 
-    fn parse(s: &str) -> Result<&str, Vec<Rich<&str>>> {
+    fn parse(s: &str) -> Result<&str, Vec<Rich<char>>> {
         parser().then_ignore(end()).parse(s).into_result()
     }
 

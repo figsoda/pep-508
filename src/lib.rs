@@ -39,7 +39,7 @@ use chumsky::{
     error::Error,
     extra::Full,
     prelude::Simple,
-    primitive::{any, choice, end, group, just},
+    primitive::{any, choice, empty, end, group, just},
     recursive::recursive,
     IterParser, Parser,
 };
@@ -132,7 +132,7 @@ pub enum Comparator {
 /// assert_eq!(parse("requests >= 2").unwrap().name, "requests");
 /// assert_eq!(parse("numpy").unwrap().name, "numpy");
 /// ```
-pub fn parse(dependency: &str) -> Result<Dependency, Vec<Simple<&str>>> {
+pub fn parse(dependency: &str) -> Result<Dependency, Vec<Simple<char>>> {
     parser().then_ignore(end()).parse(dependency).into_result()
 }
 
@@ -190,7 +190,7 @@ pub fn parser<'a, E: Error<'a, &'a str> + 'a>(
             .collect()
             .delimited_by(just('[').ignore_then(ws), just(']'))
             .then_ignore(ws)
-            .or_else(|_| Ok(Vec::new())),
+            .or(empty().map(|_| Vec::new())),
         just('@')
             .ignore_then(ws)
             .ignore_then(url::parser())
