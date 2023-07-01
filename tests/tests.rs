@@ -1,5 +1,4 @@
 use insta::assert_debug_snapshot;
-
 use pep_508::parse;
 
 #[test]
