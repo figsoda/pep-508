@@ -139,7 +139,7 @@ pub(crate) fn parser<'a, E: Error<'a, &'a str> + 'a>(
             .ignored(),
     ))
     .then(frags)
-    .slice()
+    .to_slice()
 }
 
 #[cfg(test)]

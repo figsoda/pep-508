@@ -149,7 +149,7 @@ pub fn parser<'a, E: Error<'a, &'a str> + 'a>(
                 .then(any().filter(char::is_ascii_alphanumeric))
                 .repeated(),
         )
-        .slice();
+        .to_slice();
 
     let cmp = choice((
         just("===").to(Comparator::Ae),
@@ -170,7 +170,7 @@ pub fn parser<'a, E: Error<'a, &'a str> + 'a>(
             )
             .repeated()
             .at_least(1)
-            .slice(),
+            .to_slice(),
         )
         .map(|(comparator, version)| VersionSpec {
             comparator,
@@ -215,11 +215,11 @@ pub fn parser<'a, E: Error<'a, &'a str> + 'a>(
 
                 let marker_var = choice((
                     just('\'')
-                        .ignore_then(set!(c!() | '"').repeated().slice())
+                        .ignore_then(set!(c!() | '"').repeated().to_slice())
                         .then_ignore(just('\''))
                         .map(Variable::String),
                     just('"')
-                        .ignore_then(set!(c!() | '\'').repeated().slice())
+                        .ignore_then(set!(c!() | '\'').repeated().to_slice())
                         .then_ignore(just('"'))
                         .map(Variable::String),
                     just("python_version").to(Variable::PythonVersion),
