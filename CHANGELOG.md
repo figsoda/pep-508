@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.4.0 - 2023-11-19
+
+### Fixes
+
+- Fix compatibility with chumsky 1.0.0-alpha.6 and pin chumsky version
+
 ## v0.3.0 - 2023-03-11
 
 ### Fixes
