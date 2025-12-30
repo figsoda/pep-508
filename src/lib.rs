@@ -36,12 +36,12 @@ mod macros;
 mod url;
 
 use chumsky::{
+    IterParser, Parser,
     error::Error,
     extra::Full,
     prelude::Simple,
     primitive::{any, choice, empty, end, group, just},
     recursive::recursive,
-    IterParser, Parser,
 };
 
 use crate::macros::set;
@@ -132,14 +132,14 @@ pub enum Comparator {
 /// assert_eq!(parse("requests >= 2").unwrap().name, "requests");
 /// assert_eq!(parse("numpy").unwrap().name, "numpy");
 /// ```
-pub fn parse(dependency: &str) -> Result<Dependency, Vec<Simple<char>>> {
+pub fn parse(dependency: &str) -> Result<Dependency<'_>, Vec<Simple<'_, char>>> {
     parser().then_ignore(end()).parse(dependency).into_result()
 }
 
 /// Create a [chumsky](https://docs.rs/chumsky) parser,
 /// allows more customization than [parse]
-pub fn parser<'a, E: Error<'a, &'a str> + 'a>(
-) -> impl Parser<'a, &'a str, Dependency<'a>, Full<E, (), ()>> {
+pub fn parser<'a, E: Error<'a, &'a str> + 'a>()
+-> impl Parser<'a, &'a str, Dependency<'a>, Full<E, (), ()>> {
     let ws = set!(' ' | '\t').repeated().ignored();
     let ident = any()
         .filter(char::is_ascii_alphanumeric)

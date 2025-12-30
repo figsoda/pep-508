@@ -2,7 +2,7 @@
 name = "pep-508"
 version = "0.4.0"
 authors = ["figsoda <figsoda@pm.me>"]
-edition = "2021"
+edition = "2024"
 description = "Python dependency parser for PEP 508"
 documentation = "https://docs.rs/pep-508"
 readme = "README.md"

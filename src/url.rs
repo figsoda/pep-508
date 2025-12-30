@@ -1,8 +1,8 @@
 use chumsky::{
+    Parser,
     error::Error,
     extra::Full,
     primitive::{any, choice, group, just},
-    Parser,
 };
 
 use crate::macros::set;
@@ -14,8 +14,8 @@ macro_rules! c {
     };
 }
 
-pub(crate) fn parser<'a, E: Error<'a, &'a str> + 'a>(
-) -> impl Parser<'a, &'a str, &'a str, Full<E, (), ()>> {
+pub(crate) fn parser<'a, E: Error<'a, &'a str> + 'a>()
+-> impl Parser<'a, &'a str, &'a str, Full<E, (), ()>> {
     let c = set!(c!());
     let digit = any().filter(char::is_ascii_digit);
     let hex = any().filter(char::is_ascii_hexdigit);
@@ -144,11 +144,11 @@ pub(crate) fn parser<'a, E: Error<'a, &'a str> + 'a>(
 
 #[cfg(test)]
 mod tests {
-    use chumsky::{prelude::Rich, primitive::end, Parser};
+    use chumsky::{Parser, prelude::Rich, primitive::end};
 
     use super::parser;
 
-    fn parse(s: &str) -> Result<&str, Vec<Rich<char>>> {
+    fn parse(s: &str) -> Result<&str, Vec<Rich<'_, char>>> {
         parser().then_ignore(end()).parse(s).into_result()
     }
 
