@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.5.0 - 2025-12-30
+
+### Features
+
+- Bump chumsky to 1.0.0-alpha.8
+- Migrate to Rust 2024 Edition
+
 ## v0.4.0 - 2023-11-19
 
 ### Fixes
