@@ -13,7 +13,7 @@ keywords = ["dependency", "parser", "pep508", "python", "requirements"]
 categories = ["parser-implementations"]
 
 [dependencies]
-chumsky = "=1.0.0-alpha.6"
+chumsky = "=1.0.0-alpha.7"
 
 [dev-dependencies]
 insta = "1.34.0"
